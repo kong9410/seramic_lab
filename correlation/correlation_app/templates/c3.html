@@ -1,0 +1,149 @@
+
+<!DOCTYPE HTML>
+<head>
+    <!-- stylesheet -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/c3/0.4.11/c3.min.css" />
+</head>
+
+<body>
+    <!-- javascript -->
+    <script src="https://d3js.org/d3.v4.js"></script>
+    <script src="https://d3js.org/d3-selection-multi.v1.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+    <input type="button" onclick="window.location.href='/'" value = "이동">
+    <div id="dataviz"></div>
+    <script>
+        $(document).ready(function () {
+            $.ajax({
+                url: 'api/scatter',
+                datatype: 'json',
+                success: function (data) {
+                    scatter_data = data["scatter_data"]
+                    line_data = data["line_data"]
+                    console.log(scatter_data)
+                    console.log(line_data)
+                    scatter_plot(scatter_data, line_data);
+                },
+                error: function () {
+                    console.log("error!");
+                }
+            })
+        })
+        function scatter_plot(scatter_data, line_data) {
+            // set the dimensions and margins of the graph
+            const maxwidth = 800;
+            const maxheight = 300;
+            const stroke = 'white';
+            const stroke_width = .25;
+            const radius = 3
+            const dot_color = '#0099FF'
+            const xLabel = 'average_thickness'
+            const yLabel = 'standard_deviation'
+            var margin = { top: 10, right: 30, bottom: 30, left: 60 },
+                width = maxwidth - margin.left - margin.right,
+                height = maxheight - margin.top - margin.bottom;
+
+            // append the svg object to the body of the page
+            var svg = d3.select("#dataviz")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .call(responsivefy)
+                .append("g")
+                .attr("transform",
+                    "translate(" + margin.left + "," + margin.top + ")")
+
+            
+
+            // Add X axis
+            var x = d3.scaleLinear()
+                .domain([d3.min(scatter_data, function (d) { return 0; }),
+                d3.max(scatter_data, function (d) { return d.x_data; })])      //x축 범위 지정
+                .range([0, width]);     //x축 가로 길이 지정(인터페이스)
+            svg.append("g")
+                .attr("transform", "translate(0," + height + ")")
+                .call(d3.axisBottom(x));    //선 그리기
+
+            // Add Y axis
+            var y = d3.scaleLinear()
+                .domain([0, d3.max(scatter_data, function (d) { return d.y_data; })])
+                .range([height, 0]);
+            svg.append("g")
+                .call(d3.axisLeft(y));
+
+            // Scale
+            var scale = d3.scaleLinear()
+                            .domain([0, 100])
+                            .range([0, width]);
+
+            // Add dots
+            svg.append('g')
+                .selectAll("dot")
+                .data(scatter_data)
+                .enter()
+                .append("circle")
+                .attr("cx", function (d) { return x(d.x_data); })
+                .attr("cy", function (d) { return y(d.y_data); })
+                .attr("r", radius)
+                .style("fill", dot_color)
+                .style("stroke", stroke)
+                .style("stroke-width", stroke_width)
+                .on("mouseover", function (d, i) {
+                    d3.select(this)
+                        .style('fill', 'orange')
+                        .attr('r', radius * 1.5);
+                    svg.append("text").attrs({
+                        id: 't' + Math.floor(d.x_data) + '-' + Math.floor(d.y_data) + '-' + i
+                    })
+                        .attr("x", x(d.x_data))
+                        .attr("y", y(d.y_data))
+                        .style("pointer-events", 'none')
+                        .text(d.index + ': ' + d.x_data + ', ' + d.y_data);
+                })
+                .on("mouseout", function (d, i) {
+                    d3.select(this)
+                        .style('fill', dot_color)
+                        .attr('r', radius)
+                    d3.select('#t' + Math.floor(d.x_data) + '-' + Math.floor(d.y_data) + '-' + i).remove()
+                })
+
+            svg.append('path')
+                .datum(line_data)
+                .attr("fill", "none")
+                .attr("stroke", "#994466")
+                .attr("stroke-width", 1.5)
+                .attr("d", d3.line()
+                    .x(function (d) { return x(d.x_fit) })
+                    .y(function (d) { return y(d.y_quad) })
+                )
+        }
+
+        // 반응형 가로 세로 크기
+        function responsivefy(svg) {
+            // get container + svg aspect ratio
+            var container = d3.select(svg.node().parentNode),
+                width = parseInt(svg.style("width")),
+                height = parseInt(svg.style("height")),
+                aspect = width / height;
+
+            // add viewBox and preserveAspectRatio properties,
+            // and call resize so that svg resizes on inital page load
+            svg.attr("viewBox", "0 0 " + width + " " + height)
+                .attr("preserveAspectRatio", "xMinYMid")
+                .call(resize);
+
+            // to register multiple listeners for same event type,
+            // you need to add namespace, i.e., 'click.foo'
+            // necessary if you call invoke this function for multiple svgs
+            // api docs: https://github.com/mbostock/d3/wiki/Selections#on
+            d3.select(window).on("resize." + container.attr("id"), resize);
+
+            // get width of container and resize svg to fit it
+            function resize() {
+                var targetWidth = parseInt(container.style("width"));
+                svg.attr("width", targetWidth);
+                svg.attr("height", Math.round(targetWidth / aspect));
+            }
+        }
+    </script>
+</body>
